@@ -1,11 +1,13 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from strawberry.fastapi import GraphQLRouter
 from routes import health, firestore_routes, search , auth, user
 import firebase_admin
 from firebase_admin import credentials, firestore
 from elasticsearch import Elasticsearch
 from services.es_svc import index_many
+from gql.schema import schema
 from fastapi.middleware.cors import CORSMiddleware
 
 ES_HOST = os.getenv("ELASTICSEARCH_HOST")
@@ -38,6 +40,8 @@ app.include_router(firestore_routes.router, prefix="/api/v1/firestore", tags=["f
 app.include_router(search.router, prefix="/api/v1/es", tags=["elasticsearch"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(user.router, prefix="/api/v1/user", tags=["user"])
+graphql_router = GraphQLRouter(schema, path="/graphql")
+app.include_router(graphql_router, prefix="/api/v1/es_gql", tags=["graphql"])
 @app.on_event("startup")
 def sync_all_firestore_collections_to_es():
     es = Elasticsearch(

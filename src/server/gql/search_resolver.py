@@ -4,7 +4,13 @@ from typing import List, Optional
 from elasticsearch import Elasticsearch
 
 from services.es_svc import search_keyword, filter_advanced
-from .types import FilterInput, InterFieldOperator, SearchHit, SearchResult
+from .types import (
+    FilterInput,
+    InterFieldOperator,
+    ScholarshipSource,
+    SearchHit,
+    SearchResult,
+)
 
 
 ES_HOST = os.getenv("ELASTICSEARCH_HOST")
@@ -26,7 +32,6 @@ def _es_client() -> Elasticsearch:
 def search_es(
     *,
     collection: str,
-    index: str,
     q: Optional[str] = None,
     filters: Optional[List[FilterInput]] = None,
     inter_field_operator: InterFieldOperator = InterFieldOperator.AND,
@@ -35,6 +40,16 @@ def search_es(
 ) -> SearchResult:
     es = _es_client()
     try:
+        def _to_scholarship_source(src: dict) -> ScholarshipSource:
+            # Map ES document keys to ScholarshipSource's Python attribute names
+            return ScholarshipSource(
+                name=src.get("Scholarship_Name"),
+                country=src.get("Country"),
+                start_date=src.get("Start_Date"),
+                end_date=src.get("End_Date"),
+                amount=src.get("Funding_Level"),
+            )
+
         filters_as_dicts = (
             [
                 {
@@ -51,21 +66,28 @@ def search_es(
             result = search_keyword(
                 client=es,
                 q=q,
-                index=index,
+                index=collection,
                 size=size,
                 offset=offset,
                 collection=collection,
             )
             return SearchResult(
                 total=result.get("total", 0),
-                items=[SearchHit(id=i["id"], score=i["score"], source=i["source"]) for i in result.get("items", [])],
+                items=[
+                    SearchHit(
+                        id=i["id"],
+                        score=i["score"],
+                        source=_to_scholarship_source(i["source"]) if i.get("source") else None,
+                    )
+                for i in result.get("items", [])
+                ],
             )
 
         # Case 2: filters-only
         if filters_as_dicts and not q:
             result = filter_advanced(
                 client=es,
-                index=index,
+                index=collection,
                 collection=collection,
                 filters=filters_as_dicts,
                 inter_field_operator=inter_field_operator.value,
@@ -74,21 +96,28 @@ def search_es(
             )
             return SearchResult(
                 total=result.get("total", 0),
-                items=[SearchHit(id=i["id"], score=i["score"], source=i["source"]) for i in result.get("items", [])],
+                items=[
+                    SearchHit(
+                        id=i["id"],
+                        score=i["score"],
+                        source=_to_scholarship_source(i["source"]) if i.get("source") else None,
+                    )
+                for i in result.get("items", [])
+                ],
             )
 
         # Case 3: both keyword and filters — intersect results, preserve keyword ranking
         kw = search_keyword(
             client=es,
             q=q or "",
-            index=index,
+            index=collection,
             size=size,
             offset=offset,
             collection=collection,
         )
         flt = filter_advanced(
             client=es,
-            index=index,
+            index=collection,
             collection=collection,
             filters=filters_as_dicts,
             inter_field_operator=inter_field_operator.value,
@@ -98,7 +127,13 @@ def search_es(
 
         flt_ids = {i["id"] for i in flt.get("items", [])}
         merged_items = [
-            SearchHit(id=i["id"], score=i["score"], source=i["source"]) for i in kw.get("items", []) if i["id"] in flt_ids
+            SearchHit(
+                id=i["id"],
+                score=i["score"],
+                source=_to_scholarship_source(i["source"]) if i.get("source") else None,
+            )
+            for i in kw.get("items", [])
+            if i["id"] in flt_ids
         ]
         return SearchResult(total=len(merged_items), items=merged_items)
     finally:

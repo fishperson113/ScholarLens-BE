@@ -11,7 +11,6 @@ class Query:
     def search_es(
         self,
         collection: str,
-        index: str,
         q: Optional[str] = None,
         filters: Optional[List[FilterInput]] = None,
         inter_field_operator: InterFieldOperator = InterFieldOperator.AND,
@@ -20,7 +19,6 @@ class Query:
     ) -> SearchResult:
         return search_es_resolver(
             collection=collection,
-            index=index,
             q=q,
             filters=filters,
             inter_field_operator=inter_field_operator,

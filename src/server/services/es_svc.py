@@ -140,6 +140,11 @@ def filter_advanced(
 ) -> Dict[str, Any]:
     """
     Hàm lọc tổng quát, hỗ trợ logic kết hợp linh hoạt và lọc theo collection.
+
+    Backward-compatible filter modes per clause via optional key `mode`:
+    - "match" (default): Use `match` query joining values into a single string.
+    - "term": Use `terms` query for exact keyword filtering (expects list `values`).
+    - "range": Use `range` query with optional numeric bounds via `min`/`max`.
     """
     ensure_index(client, index)
 
@@ -147,13 +152,28 @@ def filter_advanced(
     clauses = []
     for f in filters:
         field = f["field"]
-        values = f["values"]
-        intra_operator = f.get("operator", "OR").lower()
-        query_text = " ".join(map(str, values))
-        
-        clauses.append(
-            {"match": {field: {"query": query_text, "operator": intra_operator}}}
-        )
+        mode = str(f.get("mode", "match")).lower()
+
+        if mode == "term":
+            values = f.get("values", [])
+            if not isinstance(values, list):
+                values = [values]
+            if values:
+                clauses.append({"terms": {field: values}})
+        elif mode == "range":
+            rng: Dict[str, Any] = {}
+            if f.get("min") is not None:
+                rng["gte"] = f.get("min")
+            if f.get("max") is not None:
+                rng["lte"] = f.get("max")
+            if rng:
+                clauses.append({"range": {field: rng}})
+        else:
+            # default: match
+            values = f.get("values", [])
+            intra_operator = f.get("operator", "OR").lower()
+            query_text = " ".join(map(str, values))
+            clauses.append({"match": {field: {"query": query_text, "operator": intra_operator}}})
     
     query_body: Dict[str, Any] = {"bool": {}}
     

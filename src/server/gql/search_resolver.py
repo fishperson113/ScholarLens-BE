@@ -41,7 +41,7 @@ def search_es(
     es = _es_client()
     try:
         def _to_scholarship_source(src: dict) -> ScholarshipSource:
-            # Map ES document keys to ScholarshipSource's Python attribute names
+            # Map ES document keys to normalized ScholarshipSource fields
             return ScholarshipSource(
                 name=src.get("Scholarship_Name"),
                 country=src.get("Country"),
@@ -50,16 +50,24 @@ def search_es(
                 amount=src.get("Funding_Level"),
             )
 
-        filters_as_dicts = (
-            [
-                {
-                    "field": f.field,
-                    "values": list(f.values),
-                    "operator": f.operator.value,
-                }
-                for f in (filters or [])
-            ]
-        )
+        def _combine_values(f: FilterInput):
+            vals = []
+            if f.string_values:
+                vals.extend([str(v) for v in f.string_values])
+            if f.int_values:
+                vals.extend([str(v) for v in f.int_values])
+            if f.float_values:
+                vals.extend([str(v) for v in f.float_values])
+            return vals
+
+        filters_as_dicts = [
+            {
+                "field": f.field,
+                "values": _combine_values(f),
+                "operator": f.operator.value,
+            }
+            for f in (filters or [])
+        ]
 
         # Case 1: keyword-only
         if q and not filters_as_dicts:

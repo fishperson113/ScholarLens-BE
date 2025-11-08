@@ -41,7 +41,7 @@ app.include_router(search.router, prefix="/api/v1/es", tags=["elasticsearch"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(user.router, prefix="/api/v1/user", tags=["user"])
 graphql_router = GraphQLRouter(schema, path="/graphql")
-app.include_router(graphql_router, prefix="/api/v1/es_gql", tags=["graphql"])
+app.include_router(graphql_router)
 @app.on_event("startup")
 def sync_all_firestore_collections_to_es():
     es = Elasticsearch(

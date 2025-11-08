@@ -1,8 +1,9 @@
 import strawberry
 from typing import Optional, List
 
-from .types import FilterInput, InterFieldOperator, SearchResult
+from .types import FilterInput, InterFieldOperator, SearchResult, UserProfileInput, MatchResult
 from .search_resolver import search_es as search_es_resolver
+from .match_resolver import match_scholarships as match_resolver
 
 
 @strawberry.type
@@ -22,6 +23,19 @@ class Query:
             q=q,
             filters=filters,
             inter_field_operator=inter_field_operator,
+            size=size,
+            offset=offset,
+        )
+
+    @strawberry.field(name="matchScholarships", description="Recommend scholarships for a given user profile")
+    def match_scholarships(
+        self,
+        profile: Optional[UserProfileInput] = None,
+        size: int = 10,
+        offset: int = 0,
+    ) -> MatchResult:
+        return match_resolver(
+            profile=profile,
             size=size,
             offset=offset,
         )

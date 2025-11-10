@@ -7,24 +7,37 @@ from datetime import date, datetime
 @strawberry.type
 class ScholarshipSource:
     """
-    Normalized scholarship fields for GraphQL (no aliasing to ES keys).
-    Mapping from ES keys happens in resolvers.
+    Simplified scholarship fields matching actual data structure.
+    Maps directly to: id, name, university, open_time, close_time, amount, field_of_study, url
     """
     name: Optional[str]
-    country: Optional[str]
-    start_date: Optional[str]
-    end_date: Optional[str]
+    university: Optional[str]
+    open_time: Optional[str]
+    close_time: Optional[str]
     amount: Optional[str]
+    field_of_study: Optional[str]
+    url: Optional[str]
 
     @strawberry.field(description="Số ngày còn lại trước hạn nộp (computed field)")
-    def days_until_deadline(self) -> Optional[int]:
-        """Tính số ngày còn lại từ hôm nay đến End_Date"""
-        if not self.end_date:
+    def days_until_deadline(self) -> Optional[str]:
+        """Tính số ngày còn lại từ hôm nay đến close_time. Returns 'Expired' if deadline has passed."""
+        if not self.close_time:
             return None
         try:
-            end = date.fromisoformat(self.end_date)
+            # Handle DD/MM/YYYY format
+            if '/' in self.close_time:
+                day, month, year = self.close_time.split('/')
+                end = date(int(year), int(month), int(day))
+            else:
+                # Fallback to ISO format
+                end = date.fromisoformat(self.close_time)
             today = date.today()
-            return (end - today).days
+            days_left = (end - today).days
+            
+            # Return "Expired" if deadline has passed
+            if days_left < 0:
+                return "Expired"
+            return str(days_left)
         except Exception:
             return None
 
@@ -38,6 +51,12 @@ class InterFieldOperator(str, Enum):
 class IntraFieldOperator(str, Enum):
     AND = "AND"
     OR = "OR"
+
+
+@strawberry.enum
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
 
 
 @strawberry.input

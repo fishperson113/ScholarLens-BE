@@ -137,6 +137,8 @@ def filter_advanced(
     inter_field_operator: Literal["AND", "OR"] = "AND",
     size: int = 10,
     offset: int = 0,
+    sort_field: Optional[str] = None,
+    sort_order: Literal["asc", "desc"] = "asc",
 ) -> Dict[str, Any]:
     """
     Hàm lọc tổng quát, hỗ trợ logic kết hợp linh hoạt và lọc theo collection.
@@ -200,13 +202,24 @@ def filter_advanced(
     if not query_body["bool"]:
         return {"total": 0, "items": []}
 
+    # Prepare search parameters
+    search_params = {
+        "index": index,
+        "query": query_body,
+        "size": size,
+        "from_": offset,
+    }
+    
+    # Add sorting if specified
+    if sort_field:
+        # Use .keyword field for text fields to enable sorting
+        sort_field_name = f"{sort_field}.keyword" if sort_field else sort_field
+        search_params["sort"] = [
+            {sort_field_name: {"order": sort_order, "unmapped_type": "keyword"}}
+        ]
+
     # Thực thi query
-    res = client.search(
-        index=index,
-        query=query_body,
-        size=size,
-        from_=offset,
-    )
+    res = client.search(**search_params)
     hits = [
         {"id": h["_id"], "score": h["_score"], "source": h["_source"]}
         for h in res["hits"]["hits"]

@@ -1,7 +1,7 @@
 import strawberry
 from typing import Optional, List
 
-from .types import FilterInput, InterFieldOperator, SearchResult, UserProfileInput, MatchResult
+from .types import FilterInput, InterFieldOperator, SearchResult, UserProfileInput, MatchResult, SortOrder
 from .search_resolver import search_es as search_es_resolver
 from .match_resolver import match_scholarships as match_resolver
 
@@ -15,6 +15,8 @@ class Query:
         q: Optional[str] = None,
         filters: Optional[List[FilterInput]] = None,
         inter_field_operator: InterFieldOperator = InterFieldOperator.AND,
+        sort_by_deadline: bool = True,
+        sort_order: SortOrder = SortOrder.ASC,
         size: int = 10,
         offset: int = 0,
     ) -> SearchResult:
@@ -23,6 +25,8 @@ class Query:
             q=q,
             filters=filters,
             inter_field_operator=inter_field_operator,
+            sort_by_deadline=sort_by_deadline,
+            sort_order=sort_order,
             size=size,
             offset=offset,
         )

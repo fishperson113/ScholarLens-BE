@@ -29,120 +29,93 @@ def _es_client() -> Elasticsearch:
 
 def _to_summary_fields(src: dict):
     return {
-        "summary_name": src.get("Scholarship_Name"),
-        "summary_start_date": src.get("Start_Date"),
-        "summary_end_date": src.get("End_Date"),
-        "summary_amount": src.get("Funding_Level"),
+        "summary_name": src.get("name"),
+        "summary_start_date": src.get("open_time"),
+        "summary_end_date": src.get("close_time"),
+        "summary_amount": src.get("amount"),
     }
 
 def _build_matched_fields(profile: Optional[UserProfileInput], source: Dict[str, Any]) -> List[str]:
+    """
+    Build list of reasons why this scholarship matched the user profile.
+    Based on actual scholarship fields: name, university, open_time, close_time, amount, field_of_study, url
+    """
     reasons: List[str] = []
 
     if not profile:
         return reasons
 
-    # Field of study — for ease-of-use, mark as matched when profile filter is applied
+    # Field of study match
     if profile.field_of_study:
-        reasons.append(f"field_of_study_match:{profile.field_of_study}")
+        scholarship_fields = source.get("field_of_study", "")
+        if scholarship_fields and profile.field_of_study.lower() in scholarship_fields.lower():
+            reasons.append(f"field_of_study_match:{profile.field_of_study}")
 
-    # Degree
-    if profile.degree:
-        degree_fields = (
-            source.get("Degree")
-            or source.get("Eligible_Degree")
-            or source.get("required_degree")
-        )
-        required_degree = source.get("required_degree")
-        if isinstance(degree_fields, list):
-            if profile.degree in degree_fields:
-                if required_degree:
-                    reasons.append(f"degree_match:profile={profile.degree};required_degree={required_degree}")
-                else:
-                    reasons.append(f"degree_match:profile={profile.degree}")
-        elif isinstance(degree_fields, str):
-            if profile.degree == degree_fields:
-                if required_degree:
-                    reasons.append(f"degree_match:profile={profile.degree};required_degree={required_degree}")
-                else:
-                    reasons.append(f"degree_match:profile={profile.degree}")
+    # University match
+    if profile.university:
+        scholarship_uni = source.get("university", "")
+        if scholarship_uni:
+            for desired_uni in profile.university:
+                if desired_uni.lower() in scholarship_uni.lower():
+                    reasons.append(f"university_match:{desired_uni}")
+                    break
 
-    # GPA requirement (explanatory only)
-    if profile.gpa_range_4 is not None:
-        # Assume normalized numeric GPA field(s) in source
-        min_gpa_value: Optional[float] = None
-        for key in ("Min_GPA", "Minimum_GPA", "GPA"):
-            v = source.get(key)
-            if isinstance(v, (int, float)):
-                min_gpa_value = float(v)
-                break
-        if min_gpa_value is not None:
-            if profile.gpa_range_4 >= min_gpa_value:
-                reasons.append("gpa_requirement_met")
-            else:
-                reasons.append("gpa_below_requirement")
+    # Name/keyword match
+    if profile.name:
+        scholarship_name = source.get("name", "")
+        if profile.name.lower() in scholarship_name.lower():
+            reasons.append(f"name_keyword_match:{profile.name}")
+
+    # Amount match (if specified)
+    if profile.min_amount or profile.max_amount:
+        scholarship_amount = source.get("amount")
+        if scholarship_amount:
+            reasons.append(f"amount_specified:{scholarship_amount}")
 
     return reasons
 
 
 def _profile_to_filters(profile: Optional[UserProfileInput]) -> List[Dict[str, Any]]:
+    """
+    Convert user profile preferences to Elasticsearch filters.
+    Maps to actual scholarship fields: name, university, open_time, close_time, amount, field_of_study, url
+    """
     filters: List[Dict[str, Any]] = []
     if not profile:
         return filters
-    # Degree filters
-    if profile.degree:
-        # Support multiple degree mappings including required_degree
-        filters.append({"field": "Degree", "values": [profile.degree], "operator": "OR"})
-        filters.append({"field": "Eligible_Degree", "values": [profile.degree], "operator": "OR"})
-        filters.append({"field": "required_degree", "values": [profile.degree], "operator": "OR"})
+    
+    # Name/keyword search
+    if profile.name:
+        filters.append({"field": "name", "values": [profile.name], "operator": "OR"})
+
+    # University filter
+    if profile.university:
+        filters.append({"field": "university", "values": list(profile.university), "operator": "OR"})
 
     # Field of Study
     if profile.field_of_study:
-        filters.append({"field": "Eligible_Fields", "values": [profile.field_of_study], "operator": "OR"})
+        filters.append({"field": "field_of_study", "values": [profile.field_of_study], "operator": "OR"})
 
-    # Countries
-    if getattr(profile, "desired_countries", None):
+    # Amount range filters (if your ES service supports range queries on amount)
+    # Note: This may require custom handling since amount can be strings like "450 USD" or "10,000,000 VNĐ"
+    if profile.min_amount:
         filters.append({
-            "field": "Country",
-            "values": list(profile.desired_countries or []),
-            "operator": "OR",
-            # leave default match mode for broad recall
-        })
-
-    # Scholarship type
-    if getattr(profile, "desired_scholarship_type", None):
-        filters.append({
-            "field": "Scholarship_Type",
-            "values": list(profile.desired_scholarship_type or []),
+            "field": "amount",
+            "values": [profile.min_amount],
             "operator": "OR",
         })
-
-    # Funding level
-    if getattr(profile, "desired_funding_level", None):
+    
+    if profile.max_amount:
         filters.append({
-            "field": "Funding_Level",
-            "values": list(profile.desired_funding_level or []),
+            "field": "amount",
+            "values": [profile.max_amount],
             "operator": "OR",
         })
 
-    # Application mode
-    if getattr(profile, "desired_application_mode", None):
-        filters.append({
-            "field": "Application_Mode",
-            "values": list(profile.desired_application_mode or []),
-            "operator": "OR",
-        })
-
-    # GPA minimum as range (if normalized numeric field exists)
-    if profile.gpa_range_4 is not None:
-        filters.append({
-            "field": "Min_GPA",
-            "mode": "range",
-            "min": float(profile.gpa_range_4),
-        })
-
-    # Deadline range
-    if getattr(profile, "deadline_after", None) or getattr(profile, "deadline_before", None):
-        rng: Dict[str, Any] = {"field": "End_Date", "mode": "range"}
+    # Deadline range filters (close_time field)
+    # Using range mode if supported by your ES service
+    if profile.deadline_after or profile.deadline_before:
+        rng: Dict[str, Any] = {"field": "close_time", "mode": "range"}
         if profile.deadline_after:
             rng["min"] = profile.deadline_after
         if profile.deadline_before:
@@ -174,7 +147,7 @@ def match_scholarships(
 ) -> MatchResult:
     es = _es_client()
     try:
-        collection = "scholarships"
+        collection = "scholar_lens"
         filters = _profile_to_filters(profile)
 
         # Use broad retrieval with OR to get diverse candidates

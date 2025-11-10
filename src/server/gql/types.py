@@ -88,16 +88,24 @@ class SearchResult:
 
 @strawberry.input
 class UserProfileInput:
-    gpa_range_4: Optional[float] = None
-    degree: Optional[str] = None
-    field_of_study: Optional[str] = None
-    # Flexible optional filters for expanded use cases
-    desired_scholarship_type: Optional[List[str]] = None
-    desired_funding_level: Optional[List[str]] = None
-    desired_application_mode: Optional[List[str]] = None
-    # Deadline range (ISO date strings)
-    deadline_after: Optional[str] = None
-    deadline_before: Optional[str] = None
+    """
+    User profile input for matching scholarships.
+    All fields are optional - provide only the fields you want to filter by.
+    Maps to actual scholarship fields: name, university, open_time, close_time, amount, field_of_study, url
+    """
+    # Basic scholarship preferences
+    name: Optional[str] = None  # Scholarship name keyword search
+    university: Optional[List[str]] = None  # List of preferred universities
+    field_of_study: Optional[str] = None  # Desired field of study
+    
+    # Amount/funding preferences
+    min_amount: Optional[str] = None  # Minimum scholarship amount
+    max_amount: Optional[str] = None  # Maximum scholarship amount
+    
+    # Deadline preferences (DD/MM/YYYY format)
+    deadline_after: Optional[str] = None  # Only scholarships closing after this date
+    deadline_before: Optional[str] = None  # Only scholarships closing before this date
+    
 
 
 @strawberry.type

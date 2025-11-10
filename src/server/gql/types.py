@@ -60,22 +60,21 @@ class SortOrder(str, Enum):
 
 
 @strawberry.input
-class FilterInput:
+class ScholarshipFilter:
     """
-    Strongly-typed filter values to avoid generic JSON.
-    Only one of *_values needs to be provided; multiple will be merged.
+    Filter scholarships by their fields.
+    All fields are optional - provide only the fields you want to filter by.
     """
-    field: str
-    string_values: Optional[List[str]] = None
-    int_values: Optional[List[int]] = None
-    float_values: Optional[List[float]] = None
-    operator: IntraFieldOperator = IntraFieldOperator.OR
+    name: Optional[str] = None
+    university: Optional[str] = None
+    field_of_study: Optional[str] = None
+    amount: Optional[str] = None
 
 
 @strawberry.type
 class SearchHit:
     id: str
-    score: float
+    score: Optional[float]
     source: Optional[ScholarshipSource]
 
 

@@ -6,7 +6,7 @@ from elasticsearch import Elasticsearch
 
 from services.es_svc import search_keyword, filter_advanced
 from .types import (
-    FilterInput,
+    ScholarshipFilter,
     InterFieldOperator,
     ScholarshipSource,
     SearchHit,
@@ -35,9 +35,9 @@ def search_es(
     *,
     collection: str,
     q: Optional[str] = None,
-    filters: Optional[List[FilterInput]] = None,
+    filter: Optional[ScholarshipFilter] = None,
     inter_field_operator: InterFieldOperator = InterFieldOperator.AND,
-    sort_by_deadline: bool = True,
+    sort_by_deadline: bool = False,
     sort_order: SortOrder = SortOrder.ASC,
     size: int = 10,
     offset: int = 0,
@@ -55,24 +55,33 @@ def search_es(
                 url=src.get("url"),
             )
 
-        def _combine_values(f: FilterInput):
-            vals = []
-            if f.string_values:
-                vals.extend([str(v) for v in f.string_values])
-            if f.int_values:
-                vals.extend([str(v) for v in f.int_values])
-            if f.float_values:
-                vals.extend([str(v) for v in f.float_values])
-            return vals
-
-        filters_as_dicts = [
-            {
-                "field": f.field,
-                "values": _combine_values(f),
-                "operator": f.operator.value,
-            }
-            for f in (filters or [])
-        ]
+        # Convert ScholarshipFilter to ES filter dicts
+        filters_as_dicts = []
+        if filter:
+            if filter.name:
+                filters_as_dicts.append({
+                    "field": "name",
+                    "values": [filter.name],
+                    "operator": "OR",
+                })
+            if filter.university:
+                filters_as_dicts.append({
+                    "field": "university",
+                    "values": [filter.university],
+                    "operator": "OR",
+                })
+            if filter.field_of_study:
+                filters_as_dicts.append({
+                    "field": "field_of_study",
+                    "values": [filter.field_of_study],
+                    "operator": "OR",
+                })
+            if filter.amount:
+                filters_as_dicts.append({
+                    "field": "amount",
+                    "values": [filter.amount],
+                    "operator": "OR",
+                })
 
         # Case 1: No query, no filters - return all sorted by deadline
         if not q and not filters_as_dicts:
@@ -95,7 +104,7 @@ def search_es(
             hits = [
                 {
                     "id": h["_id"],
-                    "score": h["_score"],
+                    "score": h.get("_score") or 0.0,
                     "source": h["_source"]
                 }
                 for h in result["hits"]["hits"]

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from services.auth_svc import register_user, verify_token, get_profile, update_profile
-from dtos.auth_dtos import RegisterRequest, VerifyRequest, UpdateProfileRequest
+from dtos.auth_dtos import RegisterRequest, VerifyRequest
 from typing import Dict, Any
 
 router = APIRouter()
@@ -32,9 +32,8 @@ def get_user_profile(uid: str):
 
 
 @router.put("/profile/{uid}")
-def update_user_profile(uid: str, req: UpdateProfileRequest):
+def update_user_profile(uid: str, fields: Dict[str, Any] = Body(...)):
     try:
-        fields = req.dict(exclude_unset=True)
         updated = update_profile(uid, fields)
         return updated
     except Exception as e:

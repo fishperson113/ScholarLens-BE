@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from strawberry.fastapi import GraphQLRouter
-from routes import health, firestore_routes, search , auth, user
+from routes import health, firestore_routes, search, auth
 import firebase_admin
 from firebase_admin import credentials, firestore
 from elasticsearch import Elasticsearch
@@ -39,7 +39,6 @@ app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(firestore_routes.router, prefix="/api/v1/firestore", tags=["firestore"])
 app.include_router(search.router, prefix="/api/v1/es", tags=["elasticsearch"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(user.router, prefix="/api/v1/user", tags=["user"])
 graphql_router = GraphQLRouter(schema, path="/graphql")
 app.include_router(graphql_router)
 @app.on_event("startup")

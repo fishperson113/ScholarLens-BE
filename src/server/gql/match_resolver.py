@@ -33,6 +33,7 @@ def _to_summary_fields(src: dict):
         "summary_start_date": src.get("open_time"),
         "summary_end_date": src.get("close_time"),
         "summary_amount": src.get("amount"),
+        "summary_url": src.get("url"),
     }
 
 def _build_matched_fields(profile: Optional[UserProfileInput], source: Dict[str, Any]) -> List[str]:

@@ -118,6 +118,7 @@ class MatchItem:
     summary_start_date: Optional[str]
     summary_end_date: Optional[str]
     summary_amount: Optional[str]
+    summary_url: Optional[str]
 
 
 @strawberry.type
